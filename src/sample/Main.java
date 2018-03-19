@@ -18,8 +18,8 @@ import javafx.scene.layout.GridPane;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
-import java.io.File;
-import java.io.FileNotFoundException;
+import java.io.*;
+import java.net.*;
 import java.util.Observable;
 import java.util.Scanner;
 
@@ -40,6 +40,8 @@ public class Main extends Application {
 
         GridPane gridPane = new GridPane();
 
+        sharedFolder = null;
+
         //Get command line arguments
         Application.Parameters parameters;
         parameters = getParameters();
@@ -48,18 +50,38 @@ public class Main extends Application {
         for (int i = 0; i < parameters.getRaw().size(); i++)
         {
             System.out.println(parameters.getRaw().get(i));
+
+            if (i == 0) computerName = parameters.getRaw().get(0);
+
+            if (i == 1) sharedFolder = parameters.getRaw().get(1);
+
         }
+
+
+
 
         //Client listview
         clientFiles = new ListView<>();
         ObservableList<String> files = FXCollections.observableArrayList("LOL", "TEST");
         clientFiles.setItems(files);
 
+        clientFiles.getItems().clear();
+        //Load in shared folder
+
+        sharedFolder = "/home/scott/Documents/Assignment2/sharedFolder";
+
+        File directory = new File(sharedFolder);
+
+
+
+        makeClientFileList(directory);
 
         //Server listview
         serverFiles = new ListView<>();
         ObservableList<String> files2 = FXCollections.observableArrayList("server", "server.txt");
         serverFiles.setItems(files2);
+
+
 
         //Download Button
         Button downloadBtn = new Button();
@@ -74,8 +96,12 @@ public class Main extends Application {
                 file += serverFiles.getSelectionModel().getSelectedItem();
 
 
+                System.out.println("Downloading: " + file);
 
-                System.out.println("Download " + file);
+                //connectToServer(file, true);
+                connectToServer("", false);
+
+
 
             }
         });
@@ -90,12 +116,15 @@ public class Main extends Application {
 
                 String file = clientFiles.getSelectionModel().getSelectedItem();
 
-               String data = readFile(new File(file));
+
+                String data = "UPLOAD\n" + file + "\n";
+
+               data += readFile(new File(sharedFolder + "/" + file));
 
 
+                System.out.println("Uploading with command: " + data);
 
-                System.out.println(data);
-
+                connectToServer(data, false);
 
 
             }
@@ -110,8 +139,14 @@ public class Main extends Application {
         gridPane.setHgap(5.0f);
 
 
+        //Get proper names of server files
+        connectToServer("", false);
+
+
         primaryStage.setScene(new Scene(gridPane, 600, 275));
         primaryStage.show();
+
+
 
     }
 
@@ -140,16 +175,207 @@ public class Main extends Application {
             return data;
         }
 
+        System.out.println("Could not find file.");
+
         return"";
     }
 
-    public ListView<String> makeList()
+
+    void sendFiles(String data)
     {
+        try {
+            DatagramSocket socket = new DatagramSocket(16789);
+
+            String IP = "192.197.54.136";
+
+            InetAddress address = InetAddress.getByName(IP);
+            DatagramPacket outputPacket = new DatagramPacket(data.getBytes(), data.length(), address, 12465);
+
+            socket.send(outputPacket);
+
+        } catch (SocketException e) {
+            e.printStackTrace();
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        /*Alt
+        Socket socket = new Socket("localhost", 8080);
+        PrintWriter out = new PrintWriter(socket.getOutputStream());
+
+        out.print(data);
+        out.flush();*/
+    }
+
+    void connectToServer(String data, boolean downloading)
+    {
+        Socket socket = null;
+
+        try {
+            socket = new Socket("localhost", 8080);
+        } catch (UnknownHostException e) {
+        System.err.println("Unknown host");
+    } catch (IOException e) {
+        System.err.println("IOEXception while connecting to server");
+    }
+
+    //Check if socket succeeded and isn't null
+    if (socket == null) {
+        System.err.println("Null socket");
+    } //If so then start downloading/uploading
+        else {
+
+        //Upload or download file from here
+        if (downloading) {
+            //Download file data
+
+
+            //Save file locally
+
+        }
+        else if (data == "")
+        {
+
+            //Get a list of file names --------------------------------------------
+
+            //Send DIR command to server
+            send("DIR" + "\n", socket);
+
+
+            if(socket.isClosed()) System.out.println("Socket was closed");
+
+            //Close the send socket
+            /*try {
+                socket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            //open socket...
+            try {
+                socket = new Socket("localhost", 8080);
+
+                //socket.setKeepAlive(true);
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }*/
+
+
+
+            boolean tryingToConnect = true;
+
+
+
+
+            while (tryingToConnect) {
+
+
+                System.out.println("Trying to get server file list...");
+
+
+
+                try {
+                    //Receive
+                    InputStream inStream = socket.getInputStream();
+                    InputStreamReader reader = new InputStreamReader(inStream);
+                    BufferedReader input = new BufferedReader(reader);
+                    String currentLine = null;
+
+                    System.out.println(socket.getInputStream());
+
+                    //BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+                    //while (!input.ready())
+                    //{
+                    //    System.out.println("waiting for input");
+                    //}
+
+
+                    serverFiles.getItems().clear();
+
+                    while ((currentLine = input.readLine()) != null) {
+
+
+                        currentLine = input.readLine();
+                            serverFiles.getItems().add(currentLine);
+                            System.out.println("Got file: " + currentLine);
+                            tryingToConnect = false;
+                        }
+
+                   }
+                 catch (IOException e) {
+                    e.printStackTrace();
+                    System.out.println("Failure");
+                }
+            }
+        }
+        else {
+
+            //Send data string/file and upload it to server --------------------------
+
+            send(data, socket);
+
+
+        }
+    }
+
+        //Close socket
+        try{
+            socket.close();
+        } catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+
+    }
+
+    private void send(String data, Socket socket) {
+        PrintWriter fileOut = null;
+
+        try {
+            fileOut = new PrintWriter(socket.getOutputStream(), true);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        if (fileOut != null) {
+            fileOut.println(data);
+
+            fileOut.flush();
+            //fileOut.close();
+
+            if (socket.isClosed()) System.out.println("Socked was closed");
+        }
+    }
+
+    //Recursive function that can add onto the list of local files
+    public String makeClientFileList(File file)
+    {
+
         //Open directory sharedFolder
 
         ListView<String> listView = new ListView<>();
 
-     return   listView;
+
+        if (file.isDirectory()) {
+            // process all the files in that directory
+            File[] contents = file.listFiles();
+            for (File current : contents) {
+                clientFiles.getItems().add(makeClientFileList(current));
+
+            }
+        }
+        else if (file.exists())
+        {
+
+                return   file.getName();
+        }
+
+
+     return   "";
     }
 
 
