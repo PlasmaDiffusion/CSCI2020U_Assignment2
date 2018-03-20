@@ -91,15 +91,14 @@ public class Main extends Application {
             @Override
             public void handle(MouseEvent mouseEvent) {
 
-                String file = sharedFolder;
+                String file = "";
 
                 file += serverFiles.getSelectionModel().getSelectedItem();
 
 
                 System.out.println("Downloading: " + file);
 
-                //connectToServer(file, true);
-                connectToServer("", false);
+                connectToServer(file, true);
 
 
 
@@ -227,12 +226,14 @@ public class Main extends Application {
     } //If so then start downloading/uploading
         else {
 
-        //Upload or download file from here
+        //S
         if (downloading) {
-            //Download file data
+            //Send request to download file of given name (data)
+            send("DOWNLOAD" + "\n" + data + "\n",socket);
 
 
             //Save file locally
+            receiveFile(socket, new File(sharedFolder + "/" + data));
 
         }
         else if (data == "")
@@ -264,53 +265,7 @@ public class Main extends Application {
             }*/
 
 
-
-            boolean tryingToConnect = true;
-
-
-
-
-            while (tryingToConnect) {
-
-
-                System.out.println("Trying to get server file list...");
-
-
-
-                try {
-                    //Receive
-                    InputStream inStream = socket.getInputStream();
-                    InputStreamReader reader = new InputStreamReader(inStream);
-                    BufferedReader input = new BufferedReader(reader);
-                    String currentLine = null;
-
-                    System.out.println(socket.getInputStream());
-
-                    //BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-
-                    //while (!input.ready())
-                    //{
-                    //    System.out.println("waiting for input");
-                    //}
-
-
-                    serverFiles.getItems().clear();
-
-                    while ((currentLine = input.readLine()) != null) {
-
-
-                        currentLine = input.readLine();
-                            serverFiles.getItems().add(currentLine);
-                            System.out.println("Got file: " + currentLine);
-                            tryingToConnect = false;
-                        }
-
-                   }
-                 catch (IOException e) {
-                    e.printStackTrace();
-                    System.out.println("Failure");
-                }
-            }
+            receiveList(socket);
         }
         else {
 
@@ -330,6 +285,111 @@ public class Main extends Application {
             e.printStackTrace();
         }
 
+    }
+
+    //Receives the servers files and adds them to the download list
+    private void receiveList(Socket socket) {
+        boolean tryingToConnect = true;
+
+
+        while (tryingToConnect) {
+
+
+            System.out.println("Trying to get server file list...");
+
+
+
+            try {
+                //Receive
+                InputStream inStream = socket.getInputStream();
+                InputStreamReader reader = new InputStreamReader(inStream);
+                BufferedReader input = new BufferedReader(reader);
+                String currentLine = null;
+
+                System.out.println(socket.getInputStream());
+
+                //BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+                //while (!input.ready())
+                //{
+                //    System.out.println("waiting for input");
+                //}
+
+
+                serverFiles.getItems().clear();
+
+                while ((currentLine = input.readLine()) != null) {
+
+
+                        serverFiles.getItems().add(currentLine);
+                        System.out.println("Got file: " + currentLine);
+                        tryingToConnect = false;
+                    }
+
+               }
+             catch (IOException e) {
+                e.printStackTrace();
+                System.out.println("Failure");
+            }
+        }
+    }
+
+    private void receiveFile(Socket socket, File file)
+    {
+        boolean tryingToConnect = true;
+        String data = "";
+
+
+        while (tryingToConnect) {
+
+
+            System.out.println("Trying to get server file list...");
+
+
+
+            try {
+                //Receive
+                InputStream inStream = socket.getInputStream();
+                InputStreamReader reader = new InputStreamReader(inStream);
+                BufferedReader input = new BufferedReader(reader);
+                String currentLine = null;
+
+                System.out.println(socket.getInputStream());
+
+
+                while ((currentLine = input.readLine()) != null) {
+
+
+
+                    data += currentLine;
+                    System.out.println(currentLine);
+                    tryingToConnect = false;
+                }
+
+                //Check if successful in reading file
+                if (!tryingToConnect)
+                {
+                    //Print line by line
+                    try(PrintWriter out = new PrintWriter(file))
+                    {
+
+                        out.print(data);
+
+                        out.close();
+
+                    } catch (IOException e)
+                    {
+                        System.out.println("Problem while writing to file D:");
+                        e.printStackTrace();
+                    }
+                }
+
+            }
+            catch (IOException e) {
+                e.printStackTrace();
+                System.out.println("Failure");
+            }
+        }
     }
 
     private void send(String data, Socket socket) {

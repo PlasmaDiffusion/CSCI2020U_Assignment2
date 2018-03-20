@@ -43,6 +43,7 @@ public class Main extends Application {
             String currentLine = null;
 
 
+
             //Writer
             PrintWriter outStream = null;
             outStream = new PrintWriter(clientSocket.getOutputStream(), true);
@@ -78,6 +79,7 @@ public class Main extends Application {
                 //Look for name of file in second line
                 if (currentLineIndex == 1) fileName = currentLine;
 
+                if (currentLineIndex == 1 && mode == 2) break;
 
                 //First line is command and second line is name of file, so ignore those lines for the file's data
                 if(currentLineIndex > 1) data+=currentLine;
@@ -88,8 +90,8 @@ public class Main extends Application {
 
             System.out.println("Lines: " + currentLineIndex);
 
-            outStream.println("pls receive\n pretty pls\n");
-            outStream.flush();
+            //outStream.println("pls receive\n pretty pls\n");
+            //outStream.flush();
 
             if (clientSocket.isClosed()) System.out.println("socket closed");
 
@@ -110,7 +112,6 @@ public class Main extends Application {
                     {
                         System.out.println("Ready to send " + fileList.get(i));
                         outStream.println(fileList.get(i));
-                        outStream.println("\n");
 
                     }
 
@@ -123,7 +124,7 @@ public class Main extends Application {
                 case 1:
 
                     //Get data from a new file and save it
-                    receiveFile(data, new File(fileName));
+                    receiveFile(data, new File(sharedFolder + "/" + fileName));
 
 
                     break;
@@ -131,6 +132,8 @@ public class Main extends Application {
                 case 2:
 
                     //Send a file to be downloaded
+                    outputFile(outStream, new File(sharedFolder + "/" + fileName));
+
 
                     break;
             }
@@ -151,18 +154,33 @@ public class Main extends Application {
         serverSocket.close();
     }
 
-    void outputFile(String file)
+    void outputFile(PrintWriter out, File file)
     {
-        try {
-            Socket socket = new Socket("myhost.com", 8080);
 
-            PrintWriter out = new PrintWriter(socket.getOutputStream());
+        String data = "";
 
-            out.print(file);
+        //Check for file
+        if (file.exists()) {
+            // count the words in this file
+            Scanner scanner = null;
+            try {
+                scanner = new Scanner(file);
+
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
+
+            //Read in all of file
+            while (scanner.hasNext()) {
+                data += scanner.next();
+
+                System.out.println(data);
+            }
+
+
+            out.print(data);
             out.flush();
 
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
