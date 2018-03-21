@@ -166,9 +166,9 @@ public class Main extends Application {
             }
 
             //Read in all of file
-            while (scanner.hasNext()) {
-                data += scanner.next();
-
+            while (scanner.hasNextLine()) {
+                data += scanner.nextLine();
+                data += "\n";
             }
 
             return data;
