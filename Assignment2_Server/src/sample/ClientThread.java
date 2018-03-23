@@ -7,16 +7,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
+//This class contains all functions the server will need, along with serving as a thread.
 public class ClientThread extends  Thread {
 
     private static String sharedFolder = "sharedFolder";
 
+    //Boolean for Main to know when a thread is done and joined.
+    public boolean finished;
 
     Socket clientSocket;
 
     ClientThread(Socket clientSocket) {
 
-
+        finished = false;
         this.clientSocket = clientSocket;
     }
 
@@ -25,10 +28,11 @@ public class ClientThread extends  Thread {
         InputStream inStream = null;
 
 
-        //
+        //Prepare the file list
         getFileList(new File(sharedFolder));
 
 
+        //Get string from client and prepare it for reading
         try {
             inStream = clientSocket.getInputStream();
 
@@ -36,16 +40,15 @@ public class ClientThread extends  Thread {
             BufferedReader input = new BufferedReader(reader);
             String currentLine = null;
 
-            //Writer
             PrintWriter outStream = null;
 
             outStream = new PrintWriter(clientSocket.getOutputStream(), true);
 
 
-            //Prepare to read in string from client
-
+            //Prepare some variables for interpreting the data
             String data = "";
 
+            //Mode changes based on what the command is.
             int mode = -1;
 
             int currentLineIndex = 0;
@@ -65,7 +68,6 @@ public class ClientThread extends  Thread {
                     else if (currentLine.equals("DOWNLOAD")) mode = 2;
 
 
-                    System.out.println("Mode: " + mode);
                 }
 
                 System.out.println(currentLine);
@@ -77,16 +79,11 @@ public class ClientThread extends  Thread {
                 if (currentLineIndex == 1 && mode == 2) break;
 
                 //First line is command and second line is name of file, so ignore those lines for the file's data
-                if (currentLineIndex > 1) data += currentLine;
+                if (currentLineIndex > 1) {data += currentLine; data+="\n";}
 
 
                 currentLineIndex++;
             }
-
-            System.out.println("Lines: " + currentLineIndex);
-
-            //outStream.println("pls receive\n pretty pls\n");
-            //outStream.flush();
 
             if (clientSocket.isClosed()) System.out.println("socket closed");
 
@@ -103,7 +100,7 @@ public class ClientThread extends  Thread {
                     fileList = getFileList(new File(sharedFolder));
 
                     for (int i = 0; i < fileList.size(); i++) {
-                        System.out.println("Ready to send " + fileList.get(i));
+                        System.out.println(fileList.get(i));
                         outStream.println(fileList.get(i));
 
                     }
@@ -119,6 +116,8 @@ public class ClientThread extends  Thread {
                     //Get data from a new file and save it
                     receiveFile(data, new File(sharedFolder + "/" + fileName));
 
+                    //Update own file list for whenever a client needs it
+                    getFileList(new File (sharedFolder));
 
                     break;
 
@@ -131,7 +130,6 @@ public class ClientThread extends  Thread {
                     break;
             }
 
-            //Send
 
             if (input != null) input.close();
 
@@ -147,13 +145,15 @@ public class ClientThread extends  Thread {
         //Thread can now be joined
         try{
 
-            System.out.println("Thread finished.");
+            finished = true;
             join();
+
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
     }
 
+    //Output file for a client to download
     void outputFile(PrintWriter out, File file)
     {
 
@@ -175,7 +175,6 @@ public class ClientThread extends  Thread {
                 data += scanner.nextLine();
                 data +="\n";
 
-                System.out.println(data);
             }
 
 
@@ -190,13 +189,30 @@ public class ClientThread extends  Thread {
     {
 
         System.out.println("Saving file...\n");
-        System.out.println(data);
 
         //Print line by line
         try(PrintWriter out = new PrintWriter(newFile))
         {
 
-            out.print(data);
+
+            Scanner scanner = null;
+
+                scanner = new Scanner(data);
+
+
+            String currentLine = "";
+
+            //Read in all of file
+            while (scanner.hasNextLine()) {
+
+                currentLine = scanner.nextLine();
+
+
+                out.println(currentLine);
+
+
+            }
+
 
             out.close();
 

@@ -1,6 +1,7 @@
 package sample;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.EventHandler;
@@ -46,10 +47,9 @@ public class Main extends Application {
         Application.Parameters parameters;
         parameters = getParameters();
 
-        System.out.println(parameters.getRaw().size());
         for (int i = 0; i < parameters.getRaw().size(); i++)
         {
-            System.out.println(parameters.getRaw().get(i));
+            //System.out.println(parameters.getRaw().get(i));
 
             if (i == 0) computerName = parameters.getRaw().get(0);
 
@@ -58,27 +58,43 @@ public class Main extends Application {
         }
 
 
+        //Used a hardcoded folder for testing within javafx
+        //sharedFolder = "/home/scott/Documents/Assignment2/sharedFolder";
 
 
-        //Client listview
+        //Initialize client list view
         clientFiles = new ListView<>();
-        ObservableList<String> files = FXCollections.observableArrayList("LOL", "TEST");
-        clientFiles.setItems(files);
 
-        clientFiles.getItems().clear();
-        //Load in shared folder
 
-        sharedFolder = "/home/scott/Documents/Assignment2/sharedFolder";
+        //Exit if file directory was not found
+        if (sharedFolder == null)
+        {
+            System.out.println("Error: Have to enter name and a directory respectively.");
+            Platform.exit();
 
+            return;
+
+        }
+
+
+        //Make sure the directory exists.
         File directory = new File(sharedFolder);
 
+        if (!directory.isDirectory())
+        {
+            System.out.println("Error: Shared folder path was not a directory.");
+            Platform.exit();
+
+            return;
+        }
 
 
+        //List files from shared folder
         makeClientFileList(directory);
 
-        //Server listview
+        //Prepare the server listview
         serverFiles = new ListView<>();
-        ObservableList<String> files2 = FXCollections.observableArrayList("server", "server.txt");
+        ObservableList<String> files2 = FXCollections.observableArrayList("(Not connected)");
         serverFiles.setItems(files2);
 
 
@@ -91,6 +107,7 @@ public class Main extends Application {
             @Override
             public void handle(MouseEvent mouseEvent) {
 
+                //When clicked, send the selcted filename to the server to be downloaded.
                 String file = "";
 
                 file += serverFiles.getSelectionModel().getSelectedItem();
@@ -113,6 +130,7 @@ public class Main extends Application {
             @Override
             public void handle(MouseEvent mouseEvent) {
 
+                //When clicked, send the upload
                 String file = clientFiles.getSelectionModel().getSelectedItem();
 
 
@@ -125,6 +143,9 @@ public class Main extends Application {
 
                 connectToServer(data, false);
 
+
+                //After uploading receive the updated server list
+                connectToServer("", false);
 
             }
         });
@@ -168,7 +189,7 @@ public class Main extends Application {
             //Read in all of file
             while (scanner.hasNextLine()) {
                 data += scanner.nextLine();
-                data += "\n";
+                data += " \n";
             }
 
             return data;
@@ -179,35 +200,7 @@ public class Main extends Application {
         return"";
     }
 
-
-    void sendFiles(String data)
-    {
-        try {
-            DatagramSocket socket = new DatagramSocket(16789);
-
-            String IP = "192.197.54.136";
-
-            InetAddress address = InetAddress.getByName(IP);
-            DatagramPacket outputPacket = new DatagramPacket(data.getBytes(), data.length(), address, 12465);
-
-            socket.send(outputPacket);
-
-        } catch (SocketException e) {
-            e.printStackTrace();
-        } catch (UnknownHostException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        /*Alt
-        Socket socket = new Socket("localhost", 8080);
-        PrintWriter out = new PrintWriter(socket.getOutputStream());
-
-        out.print(data);
-        out.flush();*/
-    }
-
+    //First this function tries to connect to the server. Then it will send/receive something depending on the arguments.
     void connectToServer(String data, boolean downloading)
     {
         Socket socket = null;
@@ -217,16 +210,17 @@ public class Main extends Application {
         } catch (UnknownHostException e) {
         System.err.println("Unknown host");
     } catch (IOException e) {
-        System.err.println("IOEXception while connecting to server");
+        System.err.println("IOException while connecting to server");
     }
 
-    //Check if socket succeeded and isn't null
+    //Check if socket succeeded and isn't null. If it failed then exit the function.
     if (socket == null) {
-        System.err.println("Null socket");
+        System.err.println("Failed to connect");
+        return;
     } //If so then start downloading/uploading
         else {
 
-        //S
+
         if (downloading) {
             //Send request to download file of given name (data)
             send("DOWNLOAD" + "\n" + data + "\n",socket);
@@ -235,41 +229,32 @@ public class Main extends Application {
             //Save file locally
             receiveFile(socket, new File(sharedFolder + "/" + data));
 
+            //Update local directory.
+            clientFiles.getItems().clear();
+            File directory = new File(sharedFolder);
+            makeClientFileList(directory);
+
         }
-        else if (data == "")
+        else if (data == "")  //Get a list of file names --------------------------------------------
         {
 
-            //Get a list of file names --------------------------------------------
+
 
             //Send DIR command to server
             send("DIR" + "\n", socket);
 
 
-            if(socket.isClosed()) System.out.println("Socket was closed");
-
-            //Close the send socket
-            /*try {
-                socket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
+            if(socket.isClosed()) {
+                System.out.println("Socket was closed");
+                return;
             }
 
-            //open socket...
-            try {
-                socket = new Socket("localhost", 8080);
-
-                //socket.setKeepAlive(true);
-
-            } catch (IOException e) {
-                e.printStackTrace();
-            }*/
-
-
+            //Update server file list (locally)
             receiveList(socket);
         }
-        else {
+        else { //Send data string/file and upload it to server --------------------------
 
-            //Send data string/file and upload it to server --------------------------
+
 
             send(data, socket);
 
@@ -289,10 +274,6 @@ public class Main extends Application {
 
     //Receives the servers files and adds them to the download list
     private void receiveList(Socket socket) {
-        boolean tryingToConnect = true;
-
-
-        while (tryingToConnect) {
 
 
             System.out.println("Trying to get server file list...");
@@ -300,30 +281,24 @@ public class Main extends Application {
 
 
             try {
-                //Receive
+                //Receive input from server
                 InputStream inStream = socket.getInputStream();
                 InputStreamReader reader = new InputStreamReader(inStream);
                 BufferedReader input = new BufferedReader(reader);
                 String currentLine = null;
 
-                System.out.println(socket.getInputStream());
 
-                //BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-
-                //while (!input.ready())
-                //{
-                //    System.out.println("waiting for input");
-                //}
 
 
                 serverFiles.getItems().clear();
 
+                //Each line will be for one file
                 while ((currentLine = input.readLine()) != null) {
 
 
                         serverFiles.getItems().add(currentLine);
                         System.out.println("Got file: " + currentLine);
-                        tryingToConnect = false;
+
                     }
 
                }
@@ -331,16 +306,15 @@ public class Main extends Application {
                 e.printStackTrace();
                 System.out.println("Failure");
             }
-        }
+
     }
 
+    //Receive a file for download from the server
     private void receiveFile(Socket socket, File file)
     {
-        boolean tryingToConnect = true;
+        boolean readingSucceeded = false;
         String data = "";
 
-
-        while (tryingToConnect) {
 
 
             System.out.println("Trying to get server file list...");
@@ -354,7 +328,6 @@ public class Main extends Application {
                 BufferedReader input = new BufferedReader(reader);
                 String currentLine = null;
 
-                System.out.println(socket.getInputStream());
 
 
                 while ((currentLine = input.readLine()) != null) {
@@ -362,18 +335,39 @@ public class Main extends Application {
 
 
                     data += currentLine;
+                    data += "\n";
                     System.out.println(currentLine);
-                    tryingToConnect = false;
+                    readingSucceeded = true;
                 }
 
-                //Check if successful in reading file
-                if (!tryingToConnect)
+                //If successful in reading file, then save it
+                if (readingSucceeded)
                 {
+                    System.out.println("Saving file...\n");
+
                     //Print line by line
                     try(PrintWriter out = new PrintWriter(file))
                     {
 
-                        out.print(data);
+
+                        Scanner scanner = null;
+
+                        scanner = new Scanner(data);
+
+
+                        currentLine = "";
+
+                        //Read in all of file
+                        while (scanner.hasNextLine()) {
+
+                            currentLine = scanner.nextLine();
+
+
+                            out.println(currentLine);
+
+
+                        }
+
 
                         out.close();
 
@@ -382,6 +376,9 @@ public class Main extends Application {
                         System.out.println("Problem while writing to file D:");
                         e.printStackTrace();
                     }
+
+
+
                 }
 
             }
@@ -389,9 +386,10 @@ public class Main extends Application {
                 e.printStackTrace();
                 System.out.println("Failure");
             }
-        }
+
     }
 
+    //Send a string to the server
     private void send(String data, Socket socket) {
         PrintWriter fileOut = null;
 
@@ -411,7 +409,7 @@ public class Main extends Application {
         }
     }
 
-    //Recursive function that can add onto the list of local files
+    //Function that makes the list of local files
     public String makeClientFileList(File file)
     {
 
@@ -424,7 +422,7 @@ public class Main extends Application {
             // process all the files in that directory
             File[] contents = file.listFiles();
             for (File current : contents) {
-                clientFiles.getItems().add(makeClientFileList(current));
+                clientFiles.getItems().add(current.getName());
 
             }
         }
