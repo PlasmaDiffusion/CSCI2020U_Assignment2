@@ -9,10 +9,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Group;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.ListView;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
+import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.GridPane;
@@ -31,8 +28,10 @@ public class Main extends Application {
     ListView<String> clientFiles;
     ListView<String> serverFiles;
 
-    static String computerName;
     static String sharedFolder;
+    static String computerName;
+
+    String serverAddress = "localhost";
 
     @Override
     public void start(Stage primaryStage) throws Exception{
@@ -98,6 +97,18 @@ public class Main extends Application {
         serverFiles.setItems(files2);
 
 
+        //UI stuff starts from here. I wasn't yet acquainted with FXML when I began making this, so it's all in Main.
+
+        Label addressText = new Label();
+        addressText.setText("Server Address:");
+
+
+        //Server Address input field
+        TextField addressInput = new TextField();
+        addressInput.setText("localhost");
+
+
+
 
         //Download Button
         Button downloadBtn = new Button();
@@ -106,6 +117,9 @@ public class Main extends Application {
         downloadBtn.addEventFilter(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
             @Override
             public void handle(MouseEvent mouseEvent) {
+
+                //Get input server address
+                serverAddress = addressInput.getText();
 
                 //When clicked, send the selcted filename to the server to be downloaded.
                 String file = "";
@@ -130,6 +144,9 @@ public class Main extends Application {
             @Override
             public void handle(MouseEvent mouseEvent) {
 
+                //Get input server address
+                serverAddress = addressInput.getText();
+
                 //When clicked, send the upload
                 String file = clientFiles.getSelectionModel().getSelectedItem();
 
@@ -151,12 +168,16 @@ public class Main extends Application {
         });
 
 
+
         gridPane.addRow(0, uploadBtn);
         gridPane.addColumn(1, downloadBtn);
 
         gridPane.addRow(1, clientFiles);
         gridPane.addColumn(1, serverFiles);
         gridPane.setHgap(5.0f);
+
+        gridPane.addRow(2, addressText);
+        gridPane.addColumn(1, addressInput);
 
 
         //Get proper names of server files
@@ -206,7 +227,7 @@ public class Main extends Application {
         Socket socket = null;
 
         try {
-            socket = new Socket("localhost", 8080);
+            socket = new Socket(serverAddress, 8080);
         } catch (UnknownHostException e) {
         System.err.println("Unknown host");
     } catch (IOException e) {
